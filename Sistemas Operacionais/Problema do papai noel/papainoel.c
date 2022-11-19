@@ -9,8 +9,8 @@
 
 typedef sem_t sem;
 
-int elfos = 0;
-int renas = 0;
+int elfos = 0;                                            /*numero de itens no buffer*/
+int renas = 0;                                            /*numero de itens no buffer*/
 
 sem papaiNoelSem;
 sem renaSem;
@@ -43,52 +43,47 @@ void pedirAjuda(){
     usleep(1000);
 }
 
-void* papaiNoelThread(void *arg){
-    while (true){
-        wait(&papaiNoelSem);
-        wait(&multex);
-        if (renas >= 9){
-            prepararTreno();
-
-            /* No codigo do livro, o signal recebe 9 como
-             * parametro, nao sei pq.
-             * Vou deixar na funcao para fins futuros
-             * */
-            signal(&renaSem, 9); 
-            renas -= 9;
-        }else if (elfos == 3) ajudarElfos();
-        signal(&multex, 0);
+void* papaiNoelThread(void *arg){                       /*dados do papai noel*/
+    while (true){                                       /*repita para sempre*/
+        wait(&papaiNoelSem);                            /*ele espera até que um elfo ou rena o sinalize)*/
+        wait(&multex);                                  /*entra na região na crítica*/
+        if (renas >= 9){                                /*se houver nove renas esperando*/
+            prepararTreno();                            /*papai noel prepara o trenó*/
+            signal(&renaSem, 9);                        /*e sinaliza o semáforo das renas nove vezes*/
+            renas -= 9;                                 /*permitindo que as renas invoquem*/
+        }else if (elfos == 3) ajudarElfos();            /*se houver 3 elfos esperando, invoca papai noel para ajudar*/
+        signal(&multex, 0);                             /*mutex para evitar que elfos adicionais entrem enquanto três elfos estão sendo ajudados.*/
     }
 }
 
-void* renaThread(void *arg){
-    while (true){
-        wait(&multex);
-        renas++;
-        if (renas == 9) signal(&papaiNoelSem, 0);
-        signal(&multex, 0);
+void* renaThread(void *arg){                           /*dados das renas*/
+    while (true){                                      /*repita para sempre*/
+        wait(&multex);                                 /*elas esperam até que o papai noel as sinalize para se engatilharem e após entra na região crítica*/
+        renas++;                                       /*incrementam o contador de renas no buffer*/
+        if (renas == 9) signal(&papaiNoelSem, 0);      /*se a 9º rena estiver pronta, ela sinaliza o papai noel e depois se junta aos outros que esperam*/
+        signal(&multex, 0);                            /*mutex para evitar que renas adicionais entrem após a 9° rena se juntar aos outros*/                        
 
-        wait(&renaSem);
-        serAmarrada();
+        wait(&renaSem);                                /*renas esperam até serem amarradas */
+        serAmarrada();                                 /*renas são amarradas */
     }
 }
 
 
-void* elfoThread(void *arg){
-    while (true){
-        wait(&elfoTex);
-        wait(&multex);
-        elfos++;
-        if (elfos == 3) signal(&papaiNoelSem, 0);
-        else signal(&elfoTex, 0);
+void* elfoThread(void *arg){                           /*dados dos elfos*/
+    while (true){                                      /*repita para sempre*/
+        wait(&elfoTex);                                /**/
+        wait(&multex);                                 /**/
+        elfos++;                                       /*incrementam o contador de elfos no buffer*/
+        if (elfos == 3) signal(&papaiNoelSem, 0);      /*se houver 3 elfos esperando ajuda, eles sinaliza (acorda) o papai noel*/
+        else signal(&elfoTex, 0);                      /*senão houver 3 elfos é sinalizado o elfoTex*/
 
-        signal(&multex, 0);
+        signal(&multex, 0);                            
 
         pedirAjuda();
 
         wait(&multex);
-        elfos--;
-        if (elfos == 0) signal(&elfoTex, 0);
+        elfos--;                                       /*decrementa o contador de elfos no buffer*/
+        if (elfos == 0) signal(&elfoTex, 0);           /**/
         signal(&multex, 0);
     }
 }
